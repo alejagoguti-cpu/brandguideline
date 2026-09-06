@@ -1,17 +1,24 @@
 // ==========================================
-// FORMA LABS — BRAND GUIDELINES MOTION SYSTEM
+// FORMA LABS — KINETIC SCROLL & MOTION ENGINE
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. SCROLL PROGRESS BAR
+  // 1. SCROLL PROGRESS & ACTIVE SECTION HUD
   const progressBar = document.querySelector('.scroll-progress');
-  window.addEventListener('scroll', () => {
-    const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-    if (totalHeight > 0 && progressBar) {
-      const progress = (window.pageYOffset / totalHeight) * 100;
-      progressBar.style.width = `${progress}%`;
-    }
-  });
+  const hudText = document.querySelector('.scroll-hud-text');
+  const sections = document.querySelectorAll('main > section');
+
+  const sectionNames = {
+    '': '00 / INICIO',
+    'essence': '01 / ESENCIA',
+    'manifesto': '02 / VOZ',
+    'logo': '03 / MARCA',
+    'colors': '04 / COLOR',
+    'type': '05 / TIPOGRAFÍA',
+    'system': '06 / SISTEMA GRÁFICO',
+    'imagery': '07 / IMAGEN',
+    'closing': '08 / CIERRE'
+  };
 
   // 2. KINETIC CURSOR GLOW (SMOOTH LERP)
   const cursorGlow = document.querySelector('.cursor-glow');
@@ -32,55 +39,91 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     animateCursor();
 
-    // Hover expand on interactive elements
-    const interactiveElements = document.querySelectorAll('a, button, article, .cube, .shape-card, .pill-row span, .logo-dark, .logo-light');
+    const interactiveElements = document.querySelectorAll('a, button, article, .cube, .shape-card, .pill-row span, .logo-dark, .logo-light, .type-example');
     interactiveElements.forEach((el) => {
       el.addEventListener('mouseenter', () => cursorGlow.classList.add('is-hovering'));
       el.addEventListener('mouseleave', () => cursorGlow.classList.remove('is-hovering'));
     });
   }
 
-  // 3. SCROLL REVEAL (INTERSECTION OBSERVER)
-  const revealSections = document.querySelectorAll('.section, .cover');
-  const observerOptions = {
-    root: null,
-    threshold: 0.15,
-    rootMargin: '0px 0px -50px 0px'
+  // 3. CONTINUOUS SCROLL PARALLAX ENGINE (60FPS RAF)
+  let currentScroll = window.pageYOffset;
+  let targetScroll = window.pageYOffset;
+  let isScrolling = false;
+
+  const coverArt = document.querySelector('.cover-art');
+  const coverCube = document.querySelector('.cube');
+  const coverHeading = document.querySelector('.cover h1');
+  const doodleArrow = document.querySelector('.cover .kicker');
+
+  // Parallax elements with custom speeds
+  const parallaxDoodles = [
+    { el: document.querySelector('.essence'), speed: 0.08, prop: 'translateY' },
+    { el: document.querySelector('.manifesto:before'), speed: -0.15, prop: 'translateY' },
+    { el: document.querySelector('.logo:after'), speed: 0.05, prop: 'rotate' },
+    { el: document.querySelector('.colors:before'), speed: -0.06, prop: 'translateY' },
+    { el: document.querySelector('.type:before'), speed: 0.12, prop: 'translateY' },
+    { el: document.querySelector('.system:before'), speed: -0.08, prop: 'translateY' },
+    { el: document.querySelector('.closing:after'), speed: 0.04, prop: 'rotate' }
+  ];
+
+  const updateScrollMotion = () => {
+    targetScroll = window.pageYOffset;
+    currentScroll += (targetScroll - currentScroll) * 0.12;
+    const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+
+    // Update Progress Bar
+    if (totalHeight > 0 && progressBar) {
+      const progress = (targetScroll / totalHeight) * 100;
+      progressBar.style.width = `${progress}%`;
+      document.documentElement.style.setProperty('--scroll-pct', progress / 100);
+    }
+
+    // Hero Parallax while in viewport
+    if (currentScroll < window.innerHeight && coverArt && coverCube) {
+      coverArt.style.transform = `translateY(calc(-50% + ${currentScroll * 0.22}px)) rotate(${currentScroll * 0.04}deg)`;
+      coverCube.style.transform = `rotate(${30 + currentScroll * 0.08}deg) skewY(-7deg) translateY(${currentScroll * -0.15}px)`;
+      if (coverHeading) coverHeading.style.transform = `translateY(${currentScroll * 0.18}px)`;
+    }
+
+    // Determine current active section for HUD
+    let activeSectionName = '00 / INICIO';
+    sections.forEach((sec) => {
+      const rect = sec.getBoundingClientRect();
+      if (rect.top <= window.innerHeight * 0.45 && rect.bottom >= window.innerHeight * 0.2) {
+        const id = sec.id || (sec.classList.contains('manifesto') ? 'manifesto' : sec.classList.contains('logo') ? 'logo' : sec.classList.contains('colors') ? 'colors' : sec.classList.contains('type') ? 'type' : sec.classList.contains('system') ? 'system' : sec.classList.contains('imagery') ? 'imagery' : sec.classList.contains('closing') ? 'closing' : '');
+        if (sectionNames[id]) activeSectionName = sectionNames[id];
+      }
+    });
+
+    if (hudText && hudText.textContent !== activeSectionName) {
+      hudText.textContent = activeSectionName;
+    }
+
+    requestAnimationFrame(updateScrollMotion);
   };
 
-  const sectionObserver = new IntersectionObserver((entries, observer) => {
+  requestAnimationFrame(updateScrollMotion);
+
+  // 4. SCROLL REVEAL (INTERSECTION OBSERVER)
+  const revealBlocks = document.querySelectorAll('.section-reveal-block, .section');
+  const observerOptions = {
+    root: null,
+    threshold: 0.12,
+    rootMargin: '0px 0px -40px 0px'
+  };
+
+  const sectionObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
       }
     });
   }, observerOptions);
 
-  revealSections.forEach((sec) => sectionObserver.observe(sec));
+  revealBlocks.forEach((block) => sectionObserver.observe(block));
 
-  // 4. HERO 3D PARALLAX EFFECT
-  const coverSection = document.querySelector('.cover');
-  const coverArt = document.querySelector('.cover-art');
-  const cube = document.querySelector('.cube');
-
-  if (coverSection && coverArt && cube && window.innerWidth > 768) {
-    coverSection.addEventListener('mousemove', (e) => {
-      const rect = coverSection.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-
-      coverArt.style.transform = `translateY(-50%) translate3d(${x * 30}px, ${y * 30}px, 0) rotate(${x * 8}deg)`;
-      cube.style.transform = `rotate(${30 + x * 20}deg) skewY(${-7 + y * 10}deg) translate3d(${x * -25}px, ${y * -25}px, 20px)`;
-    });
-
-    coverSection.addEventListener('mouseleave', () => {
-      coverArt.style.transform = 'translateY(-50%) translate3d(0, 0, 0) rotate(0deg)';
-      cube.style.transform = 'rotate(30deg) skewY(-7deg)';
-    });
-  }
-
-  // 5. COLOR SWATCHES INTERACTIVE COPY WITH TOAST
+  // 5. COLOR SWATCHES INTERACTIVE CLICK-TO-COPY & SOUND PULSE
   const toast = document.querySelector('.copy-toast');
   const swatches = document.querySelectorAll('.swatches article');
 
@@ -94,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   swatches.forEach((card) => {
-    // Find class that matches color
     let hexValue = '#17151E';
     for (const key in hexMap) {
       if (card.classList.contains(key)) {
@@ -103,16 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    card.setAttribute('title', `Copiar ${hexValue}`);
+    card.setAttribute('title', `Clic para copiar ${hexValue}`);
 
     card.addEventListener('click', () => {
       navigator.clipboard.writeText(hexValue).then(() => {
-        // Visual feedback on card
         const small = card.querySelector('small');
         const origText = small ? small.textContent : hexValue;
-        if (small) small.textContent = '¡COPIADO!';
+        if (small) {
+          small.textContent = '¡COPIADO!';
+          small.style.fontWeight = '700';
+          small.style.transform = 'scale(1.2)';
+        }
 
-        // Toast feedback
         if (toast) {
           toast.textContent = `✓ ${hexValue} COPIADO AL PORTAPAPELES`;
           toast.classList.add('show');
@@ -120,24 +164,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setTimeout(() => {
-          if (small) small.textContent = origText;
-        }, 1500);
+          if (small) {
+            small.textContent = origText;
+            small.style.fontWeight = '';
+            small.style.transform = '';
+          }
+        }, 1400);
       });
     });
   });
 
-  // 6. 3D TILT ON LOGO CARDS
-  const logoCards = document.querySelectorAll('.logo-dark, .logo-light');
-  logoCards.forEach((card) => {
+  // 6. 3D TILT EFFECT ON CARDS
+  const tiltCards = document.querySelectorAll('.logo-dark, .logo-light, .shape-card');
+  tiltCards.forEach((card) => {
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width - 0.5;
       const y = (e.clientY - rect.top) / rect.height - 0.5;
-      card.style.transform = `perspective(600px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) translateY(-8px)`;
+      card.style.transform = `perspective(800px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg) translateY(-8px)`;
     });
 
     card.addEventListener('mouseleave', () => {
-      card.style.transform = 'perspective(600px) rotateY(0deg) rotateX(0deg) translateY(0)';
+      card.style.transform = '';
     });
   });
 
@@ -147,9 +195,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (gridCard && tinyGrid) {
     gridCard.addEventListener('mousemove', (e) => {
       const rect = gridCard.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) / 10);
-      const y = Math.round((e.clientY - rect.top) / 10);
+      const x = Math.round((e.clientX - rect.left) / 8);
+      const y = Math.round((e.clientY - rect.top) / 8);
       tinyGrid.style.backgroundPosition = `${x}px ${y}px`;
+    });
+  }
+
+  // 8. INTERACTIVE TYPE SPECIMEN WEIGHT SLIDER
+  const typeExample = document.querySelector('.type-example strong');
+  if (typeExample) {
+    let weights = [400, 500, 600, 700];
+    let currentWeightIdx = 3;
+    typeExample.style.cursor = 'pointer';
+    typeExample.setAttribute('title', 'Haz clic para cambiar el peso tipográfico');
+    typeExample.addEventListener('click', () => {
+      currentWeightIdx = (currentWeightIdx + 1) % weights.length;
+      typeExample.style.fontWeight = weights[currentWeightIdx];
+      typeExample.style.letterSpacing = currentWeightIdx === 3 ? '-0.07em' : '-0.02em';
     });
   }
 });
